@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/dash
 
 app_basename="elfloader"
 app_libs="lwip zydis libelf"
@@ -7,20 +7,7 @@ use_9p_rootfs=1
 rootfs_9p="fs0"
 use_kvm=1
 
-# https://stackoverflow.com/a/246128/4804196
-SOURCE=${BASH_SOURCE[0]}
-while [ -L "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
-    DIR=$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )
-    SOURCE=$(readlink "$SOURCE")
-    [[ $SOURCE != /* ]] && SOURCE=$DIR/$SOURCE # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
-done
-SCRIPT_DIR=$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )
-
-source "$SCRIPT_DIR"/../include/base
-
-app="$top"/apps/app-"$app_basename"
-
-source "$SCRIPT_DIR"/../include/common_functions
+. ../include/common_functions
 
 setup_elfloader()
 {
@@ -95,15 +82,19 @@ setup_app()
         git clone https://github.com/unikraft/app-"$app_basename" "$app"
     fi
 
-    pushd "$app" > /dev/null
+    cd "$app" > /dev/null
+
+#    echo setup_"$app_basename"
+
     git reset --hard HEAD
-    if test "$(type -t setup_"$app_basename")" = "function"; then
+    if  $(is_function "setup_${app_basename}") ; then
         setup_"$app_basename"
     fi
-    popd > /dev/null
+    cd - > /dev/null
 
     # Copy configuration and build files to app folder.
-    cp "$SCRIPT_DIR"/../app-"$app_basename"/files/Makefile{,.uk} "$app"
+    cp "$SCRIPT_DIR"/../app-"$app_basename"/files/Makefile "$app"
+    cp "$SCRIPT_DIR"/../app-"$app_basename"/files/Makefile.uk "$app"
     cp "$SCRIPT_DIR"/../app-"$app_basename"/files/.config "$app"
 
     if test ! -z "$app_libs"; then
@@ -119,15 +110,17 @@ setup_app_debug()
         git clone https://github.com/unikraft/app-"$app_basename" "$app"
     fi
 
-    pushd "$app" > /dev/null
+    cd "$app" > /dev/null
     git reset --hard HEAD
-    if test "$(type -t setup_"$app_basename")" = "function"; then
+    #    if test "$(type -t setup_"$app_basename")" = "function"; then
+    if  $(is_function "setup_${app_basename}") ; then
         setup_"$app_basename"
     fi
-    popd > /dev/null
+    cd - > /dev/null
 
     # Copy configuration and build files to app folder.
-    cp "$SCRIPT_DIR"/../app-"$app_basename"/files/Makefile{,.uk} "$app"
+    cp "$SCRIPT_DIR"/../app-"$app_basename"/files/Makefile "$app"
+    cp "$SCRIPT_DIR"/../app-"$app_basename"/files/Makefile.uk "$app"
     cp "$SCRIPT_DIR"/../app-"$app_basename"/files/.config_debug "$app"/.config
 
     if test ! -z "$app_libs"; then
@@ -143,15 +136,17 @@ setup_app_plain()
         git clone https://github.com/unikraft/app-"$app_basename" "$app"
     fi
 
-    pushd "$app" > /dev/null
+    cd "$app" > /dev/null
     git reset --hard HEAD
-    if test "$(type -t setup_"$app_basename")" = "function"; then
+#    if test "$(type -t setup_"$app_basename")" = "function"; then
+    if  $(is_function "setup_${app_basename}") ; then
         setup_"$app_basename"
     fi
-    popd > /dev/null
+    cd - > /dev/null
 
     # Copy configuration and build files to app folder.
-    cp "$SCRIPT_DIR"/../app-"$app_basename"/files/Makefile{,.uk} "$app"
+    cp "$SCRIPT_DIR"/../app-"$app_basename"/files/Makefile "$app"
+    cp "$SCRIPT_DIR"/../app-"$app_basename"/files/Makefile.uk "$app"
     cp "$SCRIPT_DIR"/../app-"$app_basename"/files/.config_plain "$app"/.config
 
     if test ! -z "$app_libs"; then
@@ -177,11 +172,11 @@ run()
     target_app="$1"
 
     cp "$SCRIPT_DIR"/../app-"$app_basename"/files/defaults "$apps"/run-app-elfloader/
-    pushd "$apps"/run-app-elfloader > /dev/null
+    cd "$apps"/run-app-elfloader > /dev/null
     git reset --hard HEAD
     git checkout master
     eval ./run_app.sh "$target_app"
-    popd > /dev/null
+    cd - > /dev/null
 }
 
 run_built()
@@ -198,20 +193,26 @@ run_built()
     target_app="$1"
 
     cp "$SCRIPT_DIR"/../app-"$app_basename"/files/defaults "$apps"/run-app-elfloader/
-    pushd "$apps"/run-app-elfloader > /dev/null
+    cd "$apps"/run-app-elfloader > /dev/null
     eval ./run_app.sh "$target_app"
-    popd > /dev/null
+    cd - > /dev/null
 }
 
-target_apps=("helloworld_static" "server_static" "helloworld_go_static" "server_go_static" "helloworld_cpp_static" "helloworld_rust_static_musl" "helloworld_rust_static_gnu" "nginx_static" "redis_static" "sqlite3" "bc_static" "gzip_static")
-target_apps+=("helloworld" "server" "helloworld_go" "server_go" "helloworld_cpp" "helloworld_rust" "nginx" "redis" "sqlite3" "bc" "gzip")
+# target_apps=("helloworld_static" "server_static" "helloworld_go_static" "server_go_static" "helloworld_cpp_static" "helloworld_rust_static_musl" "helloworld_rust_static_gnu" "nginx_static" "redis_static" "sqlite3" "bc_static" "gzip_static")
+target_apps="helloworld_static server_static helloworld_go_static server_go_static helloworld_cpp_static helloworld_rust_static_musl helloworld_rust_static_gnu nginx_static redis_static sqlite3 bc_static gzip_static"
+
+# target_apps+=("helloworld" "server" "helloworld_go" "server_go" "helloworld_cpp" "helloworld_rust" "nginx" "redis" "sqlite3" "bc" "gzip")
+
+target_apps="${target_apps} helloworld server helloworld_go server_go helloworld_cpp helloworld_rust nginx redis sqlite3 bc gzip"
 
 usage()
 {
 
     echo "Usage: $0 <command> [<app>]" 1>&2
     echo "  command: setup setup_debug setup_plain configure build docker_build clean docker_clean run run_built remove" 1>&2
-    echo "  app (for run): ${target_apps[@]}" 1>&2
+    #    echo "  app (for run): ${target_apps[@]}" 1>&2
+    echo "  app (for run): ${target_apps}" 1>&2
+
 }
 
 if test $# -gt 2 -o $# -eq 0; then
@@ -261,7 +262,7 @@ case "$command" in
     "run")
         if test $# -ne 2; then
             echo "'run' command requires target application as argument" 1>&2
-            echo "Target applications: ${target_apps[@]}" 1>&2
+            echo "Target applications: ${target_apps}" 1>&2
             exit 1
         fi
         run "$2"
@@ -285,3 +286,8 @@ case "$command" in
         usage
         exit 1
 esac
+
+. ../include/do_base
+
+
+#. ../include/common_command

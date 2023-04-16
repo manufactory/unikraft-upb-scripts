@@ -1,4 +1,29 @@
-#!/bin/bash
+#!/bin/sh
+
+is_function()
+{
+
+    echo "--------------> ${1}"
+    if test -n $1 ; then
+	return 1
+    fi
+
+    local type_="$(type $1  2>&1)"
+    type_="${type_}:false"
+
+    type_prefix="${type_%*function*}"
+
+    type_postfix="${type_#*function*}"
+
+    type_="${type_#${type_prefix}}"
+    type_="${type_%${type_postfix}}"
+
+    if test -z $type_; then
+	return 1
+    fi
+
+    return $(test $type_ = "function")
+}
 
 setup_base()
 {
@@ -9,11 +34,11 @@ setup_base()
     if test ! -d "$uk"; then
         git clone https://github.com/unikraft/unikraft "$uk"
     fi
-    pushd "$uk" > /dev/null
-    if test "$(type -t setup_unikraft)" = "function"; then
+    cd "$uk" > /dev/null
+    if is_function "setup_unikraft" ; then
         setup_unikraft
     fi
-    popd > /dev/null
+    cd - > /dev/null
 }
 
 install_lib()
@@ -22,11 +47,11 @@ install_lib()
     if test ! -d "$libs"/"$l"; then
         git clone https://github.com/unikraft/lib-"$l" "$libs"/"$l"
     fi
-    pushd "$libs"/"$l" > /dev/null
-    if test "$(type -t setup_"$l")" = "function"; then
+    cd "$libs"/"$l" > /dev/null
+    if is_function "setup_${l}" ; then
         setup_"$l"
     fi
-    popd > /dev/null
+    cd - > /dev/null
 }
 
 all_libs="musl lwip libcxx libcxxabi libunwind compiler-rt libc-test libsodium zlib libuuid python3 sqlite redis nginx micropython gcc libgo zydis libelf"
@@ -45,9 +70,9 @@ configure()
         exit 1
     fi
 
-    pushd "$app" > /dev/null
+    cd "$app" > /dev/null
     make menuconfig
-    popd > /dev/null
+    cd - > /dev/null
 }
 
 build()
@@ -57,10 +82,10 @@ build()
         exit 1
     fi
 
-    pushd "$app" > /dev/null
+    cd "$app" > /dev/null
     make prepare
     make -j $(nproc)
-    popd > /dev/null
+    cd - > /dev/null
 }
 
 DOCKER_REPOSITORY=index.unikraft.io/unikraft.org/hackathons/base:latest
@@ -75,14 +100,14 @@ docker_build()
     echo "$top"
     ls $(pwd)/"$top"
     cat > "$top"/build.sh <<END
-#!/bin/bash
+#!/bin/sh
 
-pushd /workdir/apps/app-"$app_basename" > /dev/null
+cd /workdir/apps/app-"$app_basename" > /dev/null
 make -j $(nproc)
-popd > /dev/null
+cd - > /dev/null
 END
     chmod a+x "$top"/build.sh
-    docker run --rm -it -v $(pwd)/"$top":/workdir "$DOCKER_REPOSITORY" /bin/bash /workdir/build.sh
+    docker run --rm -it -v $(pwd)/"$top":/workdir "$DOCKER_REPOSITORY" /bin/sh /workdir/build.sh
     rm "$top"/build.sh
 }
 
@@ -92,10 +117,10 @@ clean()
         echo "$app folder doesn't exist. Did you run '$0 setup'?" 1>&2
         exit 1
     fi
-    pushd "$app" > /dev/null
+    cd "$app" > /dev/null
     make properclean
     git reset --hard HEAD
-    popd > /dev/null
+    cd - > /dev/null
 }
 
 docker_clean()
@@ -106,14 +131,14 @@ docker_clean()
     fi
 
     cat > "$top"/clean.sh <<END
-#!/bin/bash
+#!/bin/sh
 
-pushd /workdir/apps/app-"$app_basename" > /dev/null
+cd /workdir/apps/app-"$app_basename" > /dev/null
 make properclean
-popd > /dev/null
+cd - > /dev/null
 END
     chmod a+x "$top"/clean.sh
-    docker run --rm -it -v $(pwd)/"$top":/workdir "$DOCKER_REPOSITORY" /bin/bash /workdir/clean.sh
+    docker run --rm -it -v $(pwd)/"$top":/workdir "$DOCKER_REPOSITORY" /bin/sh /workdir/clean.sh
     rm "$top"/clean.sh
 }
 
